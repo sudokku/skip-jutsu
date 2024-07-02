@@ -1,0 +1,22 @@
+{
+    "manifest_version": 3,
+    "name": "Skip Jutsu",
+    "version": "1.0",
+    "permissions": [
+        "activeTab",
+        "scripting"
+    ],
+    "host_permissions": [
+        "https://jut.su/*"
+    ],
+    "content_scripts": [
+        {
+            "matches": [
+                "https://jut.su/*"
+            ],
+            "js": [
+                "content.js"
+            ]
+        }
+    ]
+}
