@@ -77,45 +77,98 @@ function requestExternalFullscreen() {
     });
 }
 
-// Enhanced fullscreen function with multiple approaches
+// Wait for video player to be fully ready
+function waitForVideoReady() {
+    return new Promise((resolve) => {
+        let attempts = 0;
+        const maxAttempts = 10;
+
+        const checkVideo = () => {
+            const videoElement = document.querySelector('.vjs-tech');
+            const playerElement = document.querySelector('.video-js');
+
+            attempts++;
+            console.log(`🔍 Checking video readiness (attempt ${attempts}/${maxAttempts})`);
+
+            if (videoElement && playerElement && !playerElement.classList.contains('vjs-loading')) {
+                console.log('✅ Video player is ready');
+                resolve(videoElement);
+            } else if (attempts < maxAttempts) {
+                setTimeout(checkVideo, 500);
+            } else {
+                console.log('⚠️ Video readiness timeout, proceeding anyway');
+                resolve(document.querySelector('.vjs-tech'));
+            }
+        };
+
+        checkVideo();
+    });
+}
+
+// Check if browser is actually in fullscreen
+function isInFullscreen() {
+    return !!(document.fullscreenElement ||
+        document.webkitFullscreenElement ||
+        document.mozFullScreenElement ||
+        document.msFullscreenElement);
+}
+
+// Enhanced fullscreen function with better timing and verification
 async function attemptFullscreenAndPlay() {
-    let videoElement = document.querySelector('.vjs-tech');
+    console.log('🎬 Starting fullscreen and play sequence...');
+
+    // Wait for video to be ready
+    const videoElement = await waitForVideoReady();
     if (!videoElement) {
-        console.log('❌ Video element not found');
+        console.log('❌ Video element not found after waiting');
         return;
     }
 
-    console.log('🎬 Starting fullscreen and play sequence...');
+    console.log('📺 Video element ready, proceeding with fullscreen...');
 
     try {
         // First, try to request external fullscreen (F11 via server)
         await requestExternalFullscreen();
         console.log('✅ External fullscreen request sent successfully');
-    } catch (error) {
-        console.log('⚠️ External fullscreen server not available:', error.message);
-        console.log('🔄 Using fallback browser fullscreen...');
-    }
 
-    // Small delay to let F11 take effect, then handle video
-    setTimeout(async () => {
-        try {
-            // Start playing the video
-            await videoElement.play();
-            console.log('▶️ Video started playing');
-            
-        } catch (playError) {
-            console.log('❌ Autoplay failed:', playError);
-            
+        // Wait a bit longer for F11 to take effect
+        console.log('⏳ Waiting for fullscreen to activate...');
+        await new Promise(resolve => setTimeout(resolve, 1500));
+
+        // Check if fullscreen worked
+        if (isInFullscreen()) {
+            console.log('🎉 Browser is now in fullscreen mode!');
+        } else {
+            console.log('⚠️ F11 didn\'t activate fullscreen, trying browser API...');
             // Fallback: try browser fullscreen API
             try {
                 await videoElement.requestFullscreen();
-                await videoElement.play();
-                console.log('✅ Fallback: Browser fullscreen + play succeeded');
+                console.log('✅ Browser API fullscreen succeeded');
             } catch (fullscreenError) {
-                console.log('❌ All fullscreen methods failed:', fullscreenError);
+                console.log('❌ Browser API fullscreen also failed:', fullscreenError);
             }
         }
-    }, 500); // Increased delay to give F11 more time
+
+    } catch (error) {
+        console.log('⚠️ External fullscreen server not available:', error.message);
+        console.log('🔄 Using fallback browser fullscreen...');
+
+        // Fallback: try browser fullscreen API
+        try {
+            await videoElement.requestFullscreen();
+            console.log('✅ Fallback: Browser fullscreen succeeded');
+        } catch (fullscreenError) {
+            console.log('❌ All fullscreen methods failed:', fullscreenError);
+        }
+    }
+
+    // Always try to start video playback
+    try {
+        await videoElement.play();
+        console.log('▶️ Video started playing');
+    } catch (playError) {
+        console.log('❌ Autoplay failed:', playError);
+    }
 }
 
 // Check for pending fullscreen request
@@ -123,8 +176,8 @@ chrome.storage.local.get('playNext', (result) => {
     if (result.playNext) {
         chrome.storage.local.set({ 'playNext': false });
         console.log('🎯 Episode transition detected, starting fullscreen sequence...');
-        // Add a small delay to ensure video is ready
-        setTimeout(attemptFullscreenAndPlay, 500);
+        // Increased delay to ensure page is fully loaded
+        setTimeout(attemptFullscreenAndPlay, 2000);
     }
 });
 
